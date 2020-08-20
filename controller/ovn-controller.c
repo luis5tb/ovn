@@ -373,18 +373,18 @@ static const char *get_file_system_id(void)
 const char *
 get_ovs_chassis_id(const struct ovsrec_open_vswitch *cfg)
 {
+    if (controller_chassis != NULL) {
+        return controller_chassis;
+    }
+
+    const char *id_from_file = get_file_system_id();
+    if (id_from_file) {
+        return id_from_file;
+    }
+
     const char *chassis_id = cfg ? smap_get(&cfg->external_ids, "system-id")
                                  : NULL;
-
     if (!chassis_id) {
-        const char *id_from_file = get_file_system_id();
-        if (id_from_file) {
-            return id_from_file;
-        }
-        if (controller_chassis != NULL) {
-            return controller_chassis;
-        }
-
         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 1);
         VLOG_WARN_RL(&rl, "Failed to detect system-id, "
                           "configuration not found.");

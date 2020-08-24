@@ -117,8 +117,8 @@ OVS_APP_EXIT_AND_WAIT([ovsdb-server])
 AT_CLEANUP
 
 # Checks that ovn-controller populates datapath-type and iface-types
-# correctly in the Chassis other_config column.
-AT_SETUP([ovn-controller - Chassis other_config])
+# correctly in the Chassis external-ids column.
+AT_SETUP([ovn-controller - Chassis external_ids])
 AT_KEYWORDS([ovn])
 ovn_init_db ovn-sb
 
@@ -173,15 +173,15 @@ OVS_WAIT_UNTIL([check_datapath_type foobar])
 
 expected_iface_types=$(ovs-vsctl get Open_vSwitch . iface_types | tr -d '[[]] ""')
 echo "expected_iface_types = ${expected_iface_types}"
-chassis_iface_types=$(ovn-sbctl get Chassis ${sysid} other_config:iface-types | sed -e 's/\"//g')
+chassis_iface_types=$(ovn-sbctl get Chassis ${sysid} external_ids:iface-types | sed -e 's/\"//g')
 echo "chassis_iface_types = ${chassis_iface_types}"
 AT_CHECK([test "${expected_iface_types}" = "${chassis_iface_types}"])
 
-# Change the value of other_config:iface-types using ovn-sbctl.
+# Change the value of external_ids:iface-types using ovn-sbctl.
 # ovn-controller should again set it back to proper one.
-ovn-sbctl set Chassis ${sysid} other_config:iface-types="foo"
+ovn-sbctl set Chassis ${sysid} external_ids:iface-types="foo"
 OVS_WAIT_UNTIL([
-    chassis_iface_types=$(ovn-sbctl get Chassis ${sysid} other_config:iface-types | sed -e 's/\"//g')
+    chassis_iface_types=$(ovn-sbctl get Chassis ${sysid} external_ids:iface-types | sed -e 's/\"//g')
     echo "chassis_iface_types = ${chassis_iface_types}"
     test "${expected_iface_types}" = "${chassis_iface_types}"
 ])

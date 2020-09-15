@@ -340,7 +340,7 @@ encaps_run(struct ovsdb_idl_txn *ovs_idl_txn,
                 } else {
                     /* Duplicate port for ovn-chassis-id.  Arbitrarily choose
                      * to delete this one. */
-                    ovsrec_bridge_update_ports_delvalue(br, port);
+                    //ovsrec_bridge_update_ports_delvalue(br, port);
                 }
             }
         }
@@ -377,7 +377,7 @@ encaps_run(struct ovsdb_idl_txn *ovs_idl_txn,
     struct shash_node *node, *next_node;
     SHASH_FOR_EACH_SAFE (node, next_node, &tc.chassis) {
         struct chassis_node *chassis = node->data;
-        ovsrec_bridge_update_ports_delvalue(chassis->bridge, chassis->port);
+        //ovsrec_bridge_update_ports_delvalue(chassis->bridge, chassis->port);
         shash_delete(&tc.chassis, node);
         free(chassis);
     }

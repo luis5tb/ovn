@@ -154,10 +154,17 @@ add_ovs_bridge_mappings(const struct ovsrec_open_vswitch_table *ovs_table,
 
     cfg = ovsrec_open_vswitch_table_first(ovs_table);
     if (cfg) {
-        const char *mappings_cfg;
+        const char *mappings_cfg = NULL;
         char *cur, *next, *start;
 
-        mappings_cfg = smap_get(&cfg->external_ids, "ovn-bridge-mappings");
+        const char *chassis_id = get_ovs_chassis_id(cfg);
+        if (chassis_id != NULL) {
+            char *type_key = xasprintf("ovn-bridge-mappings-%s", chassis_id);
+            mappings_cfg = smap_get(&cfg->external_ids, type_key);
+        }
+        if (!mappings_cfg || !mappings_cfg[0]) {
+            mappings_cfg = smap_get(&cfg->external_ids, "ovn-bridge-mappings");
+        }
         if (!mappings_cfg || !mappings_cfg[0]) {
             return;
         }
@@ -323,7 +330,7 @@ patch_run(struct ovsdb_idl_txn *ovs_idl_txn,
     SHASH_FOR_EACH_SAFE (port_node, port_next_node, &existing_ports) {
         port = port_node->data;
         shash_delete(&existing_ports, port_node);
-        remove_port(bridge_table, port);
+        //remove_port(bridge_table, port);
     }
     shash_destroy(&existing_ports);
 }

@@ -141,8 +141,12 @@ get_hostname(const struct smap *ext_ids)
 }
 
 static const char *
-get_bridge_mappings(const struct smap *ext_ids)
+get_bridge_mappings(const struct smap *ext_ids, const char *chassis_id)
 {
+    if (chassis_id != NULL) {
+        char *mappings_key = xasprintf("ovn-bridge-mappings-%s", chassis_id);
+        return smap_get_def(ext_ids, mappings_key, "");
+    }
     return smap_get_def(ext_ids, "ovn-bridge-mappings", "");
 }
 
@@ -288,7 +292,7 @@ chassis_parse_ovs_config(const struct ovsrec_open_vswitch_table *ovs_table,
     }
 
     ovs_cfg->hostname = get_hostname(&cfg->external_ids);
-    ovs_cfg->bridge_mappings = get_bridge_mappings(&cfg->external_ids);
+    ovs_cfg->bridge_mappings = get_bridge_mappings(&cfg->external_ids, chassis_id);
     ovs_cfg->datapath_type = get_datapath_type(br_int);
     ovs_cfg->encap_csum = get_encap_csum(&cfg->external_ids);
     ovs_cfg->cms_options = get_cms_options(&cfg->external_ids);
@@ -341,13 +345,6 @@ chassis_external_ids_changed(const char *bridge_mappings,
                              bool is_interconn,
                              const struct sbrec_chassis *chassis_rec)
 {
-    const char *chassis_bridge_mappings =
-        get_bridge_mappings(&chassis_rec->external_ids);
-
-    if (strcmp(bridge_mappings, chassis_bridge_mappings)) {
-        return true;
-    }
-
     const char *chassis_datapath_type =
         smap_get_def(&chassis_rec->external_ids, "datapath-type", "");
 

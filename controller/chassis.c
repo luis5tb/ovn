@@ -773,8 +773,7 @@ chassis_cleanup(struct ovsdb_idl_txn *ovnsb_idl_txn,
     if (ovnsb_idl_txn) {
         ovsdb_idl_txn_add_comment(ovnsb_idl_txn,
                                   "ovn-controller: unregistering chassis '%s'",
-                                  chassis_rec ? chassis_rec->name
-                                  : chassis_private_rec->name);
+                                  chassis_rec->name);
         if (chassis_rec) {
             sbrec_chassis_delete(chassis_rec);
         }

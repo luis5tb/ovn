@@ -12485,11 +12485,6 @@ static const char *rbac_chassis_update[] =
     {"nb_cfg", "external_ids", "encaps", "vtep_logical_switches",
      "other_config"};
 
-static const char *rbac_chassis_private_auth[] =
-    {"name"};
-static const char *rbac_chassis_private_update[] =
-    {"nb_cfg", "nb_cfg_timestamp", "chassis"};
-
 static const char *rbac_encap_auth[] =
     {"chassis_name"};
 static const char *rbac_encap_update[] =
@@ -12526,14 +12521,6 @@ static struct rbac_perm_cfg {
         .insdel = true,
         .update = rbac_chassis_update,
         .n_update = ARRAY_SIZE(rbac_chassis_update),
-        .row = NULL
-    },{
-        .table = "Chassis_Private",
-        .auth = rbac_chassis_private_auth,
-        .n_auth = ARRAY_SIZE(rbac_chassis_private_auth),
-        .insdel = true,
-        .update = rbac_chassis_private_update,
-        .n_update = ARRAY_SIZE(rbac_chassis_private_update),
         .row = NULL
     },{
         .table = "Encap",
@@ -12706,30 +12693,12 @@ update_northbound_cfg(struct northd_context *ctx,
     /* Update northbound hv_cfg if appropriate. */
     if (nbg) {
         /* Find minimum nb_cfg among all chassis. */
-        const struct sbrec_chassis_private *chassis_priv;
+        const struct sbrec_chassis *chassis;
         int64_t hv_cfg = nbg->nb_cfg;
-        int64_t hv_cfg_ts = 0;
-        SBREC_CHASSIS_PRIVATE_FOR_EACH (chassis_priv, ctx->ovnsb_idl) {
-            const struct sbrec_chassis *chassis = chassis_priv->chassis;
-            if (chassis) {
-                if (smap_get_bool(&chassis->other_config,
-                                  "is-remote", false)) {
-                    /* Skip remote chassises. */
-                    continue;
-                }
-            } else {
-                static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 1);
-                VLOG_WARN_RL(&rl, "Chassis does not exist for "
-                             "Chassis_Private record, name: %s",
-                             chassis_priv->name);
-            }
-
-            if (chassis_priv->nb_cfg < hv_cfg) {
-                hv_cfg = chassis_priv->nb_cfg;
-                hv_cfg_ts = chassis_priv->nb_cfg_timestamp;
-            } else if (chassis_priv->nb_cfg == hv_cfg &&
-                       chassis_priv->nb_cfg_timestamp > hv_cfg_ts) {
-                hv_cfg_ts = chassis_priv->nb_cfg_timestamp;
+        SBREC_CHASSIS_FOR_EACH (chassis, ctx->ovnsb_idl) {
+            if (!smap_get_bool(&chassis->other_config, "is-remote", false) &&
+                chassis->nb_cfg < hv_cfg) {
+                hv_cfg = chassis->nb_cfg;
             }
         }
 
@@ -12743,10 +12712,8 @@ update_northbound_cfg(struct northd_context *ctx,
 
 /* Handle a fairly small set of changes in the southbound database. */
 static void
-ovnsb_db_run(struct northd_context *ctx,
-             struct ovsdb_idl_loop *sb_loop,
-             struct hmap *ports,
-             int64_t loop_start_time)
+ovnsb_db_run(struct northd_context *ctx, struct ovsdb_idl_loop *sb_loop,
+             struct hmap *ports)
 {
     if (!ctx->ovnnb_txn || !ovsdb_idl_has_ever_connected(ctx->ovnsb_idl)) {
         return;
@@ -13034,22 +13001,13 @@ main(int argc, char *argv[])
     ovsdb_idl_add_column(ovnsb_idl_loop.idl, &sbrec_meter_band_col_burst_size);
 
     ovsdb_idl_add_table(ovnsb_idl_loop.idl, &sbrec_table_chassis);
+    ovsdb_idl_add_column(ovnsb_idl_loop.idl, &sbrec_chassis_col_nb_cfg);
     ovsdb_idl_add_column(ovnsb_idl_loop.idl, &sbrec_chassis_col_name);
     ovsdb_idl_add_column(ovnsb_idl_loop.idl, &sbrec_chassis_col_other_config);
     ovsdb_idl_add_column(ovnsb_idl_loop.idl, &sbrec_chassis_col_encaps);
 
     ovsdb_idl_add_table(ovnsb_idl_loop.idl, &sbrec_table_encap);
     ovsdb_idl_add_column(ovnsb_idl_loop.idl, &sbrec_encap_col_type);
-
-    ovsdb_idl_add_table(ovnsb_idl_loop.idl, &sbrec_table_chassis_private);
-    ovsdb_idl_add_column(ovnsb_idl_loop.idl,
-                         &sbrec_chassis_private_col_name);
-    ovsdb_idl_add_column(ovnsb_idl_loop.idl,
-                         &sbrec_chassis_private_col_chassis);
-    ovsdb_idl_add_column(ovnsb_idl_loop.idl,
-                         &sbrec_chassis_private_col_nb_cfg);
-    ovsdb_idl_add_column(ovnsb_idl_loop.idl,
-                         &sbrec_chassis_private_col_nb_cfg_timestamp);
 
     ovsdb_idl_add_table(ovnsb_idl_loop.idl, &sbrec_table_ha_chassis);
     add_column_noalert(ovnsb_idl_loop.idl,

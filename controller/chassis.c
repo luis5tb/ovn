@@ -317,27 +317,25 @@ chassis_parse_ovs_config(const struct ovsrec_open_vswitch_table *ovs_table,
 }
 
 static void
-chassis_build_other_config(struct smap *config, const char *bridge_mappings,
+chassis_build_external_ids(struct smap *ext_ids, const char *bridge_mappings,
                            const char *datapath_type, const char *cms_options,
                            const char *monitor_all, const char *chassis_macs,
                            const char *iface_types,
                            const char *enable_lflow_cache, bool is_interconn)
 {
-    smap_replace(config, "ovn-bridge-mappings", bridge_mappings);
-    smap_replace(config, "datapath-type", datapath_type);
-    smap_replace(config, "ovn-cms-options", cms_options);
-    smap_replace(config, "ovn-monitor-all", monitor_all);
-    smap_replace(config, "ovn-enable-lflow-cache", enable_lflow_cache);
-    smap_replace(config, "iface-types", iface_types);
-    smap_replace(config, "ovn-chassis-mac-mappings", chassis_macs);
-    smap_replace(config, "is-interconn", is_interconn ? "true" : "false");
+    smap_replace(ext_ids, "ovn-bridge-mappings", bridge_mappings);
+    smap_replace(ext_ids, "datapath-type", datapath_type);
+    smap_replace(ext_ids, "ovn-cms-options", cms_options);
+    smap_replace(ext_ids, "iface-types", iface_types);
+    smap_replace(ext_ids, "ovn-chassis-mac-mappings", chassis_macs);
+    smap_replace(ext_ids, "is-interconn", is_interconn ? "true" : "false");
 }
 
 /*
  * Returns true if any external-id doesn't match the values in 'chassis-rec'.
  */
 static bool
-chassis_other_config_changed(const char *bridge_mappings,
+chassis_external_ids_changed(const char *bridge_mappings,
                              const char *datapath_type,
                              const char *cms_options,
                              const char *monitor_all,
@@ -348,21 +346,21 @@ chassis_other_config_changed(const char *bridge_mappings,
                              const struct sbrec_chassis *chassis_rec)
 {
     const char *chassis_bridge_mappings =
-        get_bridge_mappings(&chassis_rec->other_config);
+        get_bridge_mappings(&chassis_rec->external_ids);
 
     if (strcmp(bridge_mappings, chassis_bridge_mappings)) {
         return true;
     }
 
     const char *chassis_datapath_type =
-        smap_get_def(&chassis_rec->other_config, "datapath-type", "");
+        smap_get_def(&chassis_rec->external_ids, "datapath-type", "");
 
     if (strcmp(datapath_type, chassis_datapath_type)) {
         return true;
     }
 
     const char *chassis_cms_options =
-        get_cms_options(&chassis_rec->other_config);
+        get_cms_options(&chassis_rec->external_ids);
 
     if (strcmp(cms_options, chassis_cms_options)) {
         return true;
@@ -383,20 +381,20 @@ chassis_other_config_changed(const char *bridge_mappings,
     }
 
     const char *chassis_mac_mappings =
-        get_chassis_mac_mappings(&chassis_rec->other_config);
+        get_chassis_mac_mappings(&chassis_rec->external_ids);
     if (strcmp(chassis_macs, chassis_mac_mappings)) {
         return true;
     }
 
     const char *chassis_iface_types =
-        smap_get_def(&chassis_rec->other_config, "iface-types", "");
+        smap_get_def(&chassis_rec->external_ids, "iface-types", "");
 
     if (strcmp(ds_cstr_ro(iface_types), chassis_iface_types)) {
         return true;
     }
 
     bool chassis_is_interconn =
-        smap_get_bool(&chassis_rec->other_config, "is-interconn", false);
+        smap_get_bool(&chassis_rec->external_ids, "is-interconn", false);
     if (chassis_is_interconn != is_interconn) {
         return true;
     }
@@ -601,7 +599,7 @@ chassis_update(const struct sbrec_chassis *chassis_rec,
         updated = true;
     }
 
-    if (chassis_other_config_changed(ovs_cfg->bridge_mappings,
+    if (chassis_external_ids_changed(ovs_cfg->bridge_mappings,
                                      ovs_cfg->datapath_type,
                                      ovs_cfg->cms_options,
                                      ovs_cfg->monitor_all,
@@ -610,10 +608,10 @@ chassis_update(const struct sbrec_chassis *chassis_rec,
                                      &ovs_cfg->iface_types,
                                      ovs_cfg->is_interconn,
                                      chassis_rec)) {
-        struct smap other_config;
+        struct smap ext_ids;
 
-        smap_clone(&other_config, &chassis_rec->other_config);
-        chassis_build_other_config(&other_config, ovs_cfg->bridge_mappings,
+        smap_clone(&ext_ids, &chassis_rec->external_ids);
+        chassis_build_external_ids(&ext_ids, ovs_cfg->bridge_mappings,
                                    ovs_cfg->datapath_type,
                                    ovs_cfg->cms_options,
                                    ovs_cfg->monitor_all,
@@ -621,14 +619,9 @@ chassis_update(const struct sbrec_chassis *chassis_rec,
                                    ds_cstr_ro(&ovs_cfg->iface_types),
                                    ovs_cfg->enable_lflow_cache,
                                    ovs_cfg->is_interconn);
-        sbrec_chassis_verify_other_config(chassis_rec);
-        sbrec_chassis_set_other_config(chassis_rec, &other_config);
-        /* TODO(lucasagomes): Continue writing the configuration to the
-         * external_ids column for backward compatibility with the current
-         * systems, this behavior should be removed in the future. */
-        sbrec_chassis_set_external_ids(chassis_rec, &other_config);
-        smap_destroy(&other_config);
-        updated = true;
+        sbrec_chassis_verify_external_ids(chassis_rec);
+        sbrec_chassis_set_external_ids(chassis_rec, &ext_ids);
+        smap_destroy(&ext_ids);
     }
 
     update_chassis_transport_zones(transport_zones, chassis_rec);
@@ -705,7 +698,7 @@ chassis_get_mac(const struct sbrec_chassis *chassis_rec,
                 struct eth_addr *chassis_mac)
 {
     const char *tokens
-        = get_chassis_mac_mappings(&chassis_rec->other_config);
+        = get_chassis_mac_mappings(&chassis_rec->external_ids);
     if (!tokens[0]) {
        return false;
     }

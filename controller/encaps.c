@@ -322,6 +322,9 @@ encaps_run(struct ovsdb_idl_txn *ovs_idl_txn,
      *
      * Collect all the OVN-created tunnels into tc.tunnel_hmap. */
     OVSREC_BRIDGE_TABLE_FOR_EACH (br, bridge_table) {
+        if (strcmp(br_int->name, br->name)) {
+            continue;
+        }
         for (size_t i = 0; i < br->n_ports; i++) {
             const struct ovsrec_port *port = br->ports[i];
             sset_add(&tc.port_names, port->name);

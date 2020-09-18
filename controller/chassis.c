@@ -123,9 +123,10 @@ chassis_register_ovs_idl(struct ovsdb_idl *ovs_idl)
 }
 
 static const char *
-get_hostname(const struct smap *ext_ids)
+get_hostname(const struct smap *ext_ids, const char *chassis_id)
 {
-    const char *hostname = smap_get_def(ext_ids, "hostname", "");
+    const char *hostname = get_chassis_external_id_value(
+        ext_ids, chassis_id, "hostname", "");
 
     if (strlen(hostname) == 0) {
         static char hostname_[HOST_NAME_MAX + 1];
@@ -141,27 +142,31 @@ get_hostname(const struct smap *ext_ids)
 }
 
 static const char *
-get_bridge_mappings(const struct smap *ext_ids)
+get_bridge_mappings(const struct smap *ext_ids, const char *chassis_id)
 {
-    return smap_get_def(ext_ids, "ovn-bridge-mappings", "");
+    return get_chassis_external_id_value(
+        ext_ids, chassis_id, "ovn-bridge-mappings", "");
 }
 
 const char *
-get_chassis_mac_mappings(const struct smap *ext_ids)
+get_chassis_mac_mappings(const struct smap *ext_ids, const char *chassis_id)
 {
-    return smap_get_def(ext_ids, "ovn-chassis-mac-mappings", "");
+    return get_chassis_external_id_value(
+        ext_ids, chassis_id, "ovn-chassis-mac-mappings", "");
 }
 
 static const char *
-get_cms_options(const struct smap *ext_ids)
+get_cms_options(const struct smap *ext_ids, const char *chassis_id)
 {
-    return smap_get_def(ext_ids, "ovn-cms-options", "");
+    return get_chassis_external_id_value(
+        ext_ids, chassis_id, "ovn-cms-options", "");
 }
 
 static const char *
-get_encap_csum(const struct smap *ext_ids)
+get_encap_csum(const struct smap *ext_ids, const char *chassis_id)
 {
-    return smap_get_def(ext_ids, "ovn-encap-csum", "true");
+    return get_chassis_external_id_value(
+        ext_ids, chassis_id, "ovn-encap-csum", "true");
 }
 
 static const char *
@@ -175,9 +180,10 @@ get_datapath_type(const struct ovsrec_bridge *br_int)
 }
 
 static bool
-get_is_interconn(const struct smap *ext_ids)
+get_is_interconn(const struct smap *ext_ids, const char *chassis_id)
 {
-    return smap_get_bool(ext_ids, "ovn-is-interconn", false);
+    return get_chassis_external_id_value(
+        ext_ids, chassis_id, "ovn-is-interconn", false);
 }
 
 static void
@@ -263,19 +269,25 @@ chassis_parse_ovs_config(const struct ovsrec_open_vswitch_table *ovs_table,
         return false;
     }
 
-    const char *encap_type = smap_get(&cfg->external_ids, "ovn-encap-type");
-    const char *encap_ips = smap_get(&cfg->external_ids, "ovn-encap-ip");
+    const char *chassis_id = get_ovs_chassis_id(cfg);
+    const struct smap *ext_ids = &cfg->external_ids;
+
+    const char *encap_type = get_chassis_external_id_value(
+        ext_ids, chassis_id, "ovn-encap-type", NULL);
+    const char *encap_ips = get_chassis_external_id_value(
+        ext_ids, chassis_id, "ovn-encap-ip", NULL);
+
     if (!encap_type || !encap_ips) {
         VLOG_INFO("Need to specify an encap type and ip");
         return false;
     }
 
-    ovs_cfg->hostname = get_hostname(&cfg->external_ids);
-    ovs_cfg->bridge_mappings = get_bridge_mappings(&cfg->external_ids);
+    ovs_cfg->hostname = get_hostname(ext_ids, chassis_id);
+    ovs_cfg->bridge_mappings = get_bridge_mappings(ext_ids, chassis_id);
     ovs_cfg->datapath_type = get_datapath_type(br_int);
-    ovs_cfg->encap_csum = get_encap_csum(&cfg->external_ids);
-    ovs_cfg->cms_options = get_cms_options(&cfg->external_ids);
-    ovs_cfg->chassis_macs = get_chassis_mac_mappings(&cfg->external_ids);
+    ovs_cfg->encap_csum = get_encap_csum(ext_ids, chassis_id);
+    ovs_cfg->cms_options = get_cms_options(ext_ids, chassis_id);
+    ovs_cfg->chassis_macs = get_chassis_mac_mappings(ext_ids, chassis_id);
 
     if (!chassis_parse_ovs_encap_type(encap_type, &ovs_cfg->encap_type_set)) {
         return false;
@@ -293,7 +305,7 @@ chassis_parse_ovs_config(const struct ovsrec_open_vswitch_table *ovs_table,
         sset_destroy(&ovs_cfg->encap_ip_set);
     }
 
-    ovs_cfg->is_interconn = get_is_interconn(&cfg->external_ids);
+    ovs_cfg->is_interconn = get_is_interconn(ext_ids, chassis_id);
 
     return true;
 }
@@ -325,7 +337,7 @@ chassis_external_ids_changed(const char *bridge_mappings,
                              const struct sbrec_chassis *chassis_rec)
 {
     const char *chassis_bridge_mappings =
-        get_bridge_mappings(&chassis_rec->external_ids);
+        get_bridge_mappings(&chassis_rec->external_ids, NULL);
 
     if (strcmp(bridge_mappings, chassis_bridge_mappings)) {
         return true;
@@ -339,14 +351,14 @@ chassis_external_ids_changed(const char *bridge_mappings,
     }
 
     const char *chassis_cms_options =
-        get_cms_options(&chassis_rec->external_ids);
+        get_cms_options(&chassis_rec->external_ids, NULL);
 
     if (strcmp(cms_options, chassis_cms_options)) {
         return true;
     }
 
     const char *chassis_mac_mappings =
-        get_chassis_mac_mappings(&chassis_rec->external_ids);
+        get_chassis_mac_mappings(&chassis_rec->external_ids, NULL);
     if (strcmp(chassis_macs, chassis_mac_mappings)) {
         return true;
     }
@@ -643,7 +655,7 @@ chassis_get_mac(const struct sbrec_chassis *chassis_rec,
                 struct eth_addr *chassis_mac)
 {
     const char *tokens
-        = get_chassis_mac_mappings(&chassis_rec->external_ids);
+        = get_chassis_mac_mappings(&chassis_rec->external_ids, NULL);
     if (!tokens[0]) {
        return false;
     }

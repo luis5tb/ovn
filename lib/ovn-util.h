@@ -18,6 +18,7 @@
 
 #include "lib/packets.h"
 #include "include/ovn/version.h"
+#include "smap.h"
 
 #define ovn_set_program_name(name) \
     ovs_set_program_name(name, OVN_PACKAGE_VERSION)
@@ -143,6 +144,23 @@ struct v46_ip {
 bool ip46_parse_cidr(const char *str, struct v46_ip *prefix,
                      unsigned int *plen);
 bool ip46_equals(const struct v46_ip *addr1, const struct v46_ip *addr2);
+
+const char *
+get_chassis_external_id_value(const struct smap *external_ids,
+                              const char *chassis_id, const char *option_key,
+                              const char *def);
+
+int
+get_chassis_external_id_value_int(const struct smap *external_ids,
+                                  const char *chassis_id,
+                                  const char *option_key,
+                                  int def);
+
+bool
+get_chassis_external_id_value_bool(const struct smap *external_ids,
+                                   const char *chassis_id,
+                                   const char *option_key,
+                                   bool def);
 
 /* Returns a lowercase copy of orig.
  * Caller must free the returned string.
